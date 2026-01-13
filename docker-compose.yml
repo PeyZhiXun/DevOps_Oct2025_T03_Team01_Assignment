@@ -18,6 +18,12 @@ services:
       - "5000:5000"
     depends_on:
       - db
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: devops_db
+      DB_USER: devops_user
+      DB_PASSWORD: devops_pass123
 
 volumes:
   pgdata:
