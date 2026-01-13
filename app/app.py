@@ -66,6 +66,7 @@ def db_test():
         return {"ok": False, "error": str(e)}, 500
 
 
+# AUTH (feat/auth)
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
@@ -90,11 +91,15 @@ def login():
         flash("Invalid login")
         return redirect("/login")
 
+    # store session
     session["user_id"] = row[0]
     session["username"] = username
     session["role"] = row[2]
 
-    return redirect("/admin" if row[2] == "admin" else "/dashboard")
+    # assignment role redirect
+    if row[2] == "admin":
+        return redirect("/admin")
+    return redirect("/dashboard")
 
 
 @app.route("/logout")
