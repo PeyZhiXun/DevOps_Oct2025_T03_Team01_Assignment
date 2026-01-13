@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1 class="title">Login</h1>
+      <p class="subtitle">Sign in to access your dashboard</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for msg in messages %}
+          <div class="error">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form class="form" method="post">
+      <div>
+        <div class="label">Username</div>
+        <input class="input" name="username" placeholder="e.g. user01" required>
+      </div>
+
+      <div>
+        <div class="label">Password</div>
+        <input class="input" name="password" type="password" placeholder="••••••••" required>
+      </div>
+
+      <button class="btn" type="submit">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>
