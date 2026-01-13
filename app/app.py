@@ -1,3 +1,5 @@
+# CI trigger comment
+
 from flask import Flask
 import os
 import psycopg
