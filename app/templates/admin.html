@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="card card-wide">
+    <div class="topbar">
+      <div>
+        <h1 class="title">Admin Dashboard</h1>
+        <p class="subtitle">Create and delete users (admin only)</p>
+      </div>
+
+      <a class="btn btn-link" href="/logout">Logout</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for msg in messages %}
+          <div class="error">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <hr class="hr" />
+
+    <h2>Create User</h2>
+    <p class="muted">Passwords are securely hashed before storage.</p>
+
+    <form class="form" method="post" action="/admin/create_user">
+      <div class="grid3">
+        <div>
+          <div class="label">Username</div>
+          <input class="input" name="username" required>
+        </div>
+
+        <div>
+          <div class="label">Password</div>
+          <input class="input" name="password" type="password" required>
+        </div>
+
+        <div>
+          <div class="label">Role</div>
+          <select class="input" name="role">
+            <option value="user" selected>user</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" type="submit">Create user</button>
+    </form>
+
+    <hr class="hr" />
+
+    <h2>All Users</h2>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th class="actions">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u[0] }}</td>
+            <td>{{ u[1] }}</td>
+            <td>{{ u[2] }}</td>
+            <td class="actions">
+              <form method="post"
+                    action="/admin/delete_user/{{ u[0] }}"
+                    onsubmit="return confirm('Delete user {{ u[1] }}?');">
+                <button class="btn btn-danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,11 +1,11 @@
-from flask import Flask, request, redirect, session, render_template, flash, abort
+from flask import Flask, request, redirect, session, render_template, flash, abort, url_for
 import os
 import psycopg
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")  
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
 
 
 def get_conn():
@@ -49,6 +49,17 @@ def login_required(fn):
     return wrapper
 
 
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect("/login")
+        if session.get("role") != "admin":
+            abort(403)
+        return fn(*args, **kwargs)
+    return wrapper
+
+
 @app.route("/")
 def home():
     return "DevSecOps MVP is running"
@@ -75,10 +86,6 @@ def login():
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
 
-    if not username or not password:
-        flash("Username and password required")
-        return redirect("/login")
-
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -91,12 +98,10 @@ def login():
         flash("Invalid login")
         return redirect("/login")
 
-    # store session
     session["user_id"] = row[0]
     session["username"] = username
     session["role"] = row[2]
 
-    # assignment role redirect
     if row[2] == "admin":
         return redirect("/admin")
     return redirect("/dashboard")
@@ -109,18 +114,85 @@ def logout():
     return redirect("/login")
 
 
-@app.route("/admin")
+# ADMIN USERS (feat/admin-users)
+@app.route("/admin", methods=["GET"])
 @login_required
-def admin_placeholder():
-    if session.get("role") != "admin":
-        abort(403)
-    return "Admin placeholder (build in feat/admin-users)"
+@admin_required
+def admin_dashboard():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, username, role FROM users ORDER BY id;")
+            users = cur.fetchall()
+
+    return render_template("admin.html", users=users)
+
+
+@app.route("/admin/create_user", methods=["POST"])
+@login_required
+@admin_required
+def admin_create_user():
+    username = (request.form.get("username") or "").strip()
+    password = request.form.get("password") or ""
+    role = (request.form.get("role") or "user").strip()
+
+    if not username or not password:
+        flash("Username and password are required.")
+        return redirect(url_for("admin_dashboard"))
+
+    if role not in ("admin", "user"):
+        flash("Role must be 'admin' or 'user'.")
+        return redirect(url_for("admin_dashboard"))
+
+    password_hash = generate_password_hash(password)
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s);",
+                    (username, password_hash, role),
+                )
+            conn.commit()
+        flash(f"User '{username}' created.")
+    except psycopg.errors.UniqueViolation:
+        flash("That username already exists.")
+    except Exception:
+        flash("Failed to create user due to server error.")
+
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/delete_user/<int:user_id>", methods=["POST"])
+@login_required
+@admin_required
+def admin_delete_user(user_id: int):
+    if session.get("user_id") == user_id:
+        flash("You cannot delete your own account while logged in.")
+        return redirect(url_for("admin_dashboard"))
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE id = %s;", (user_id,))
+            deleted = cur.rowcount
+        conn.commit()
+
+    if deleted:
+        flash("User deleted.")
+    else:
+        flash("User not found.")
+
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/dashboard")
 @login_required
 def dashboard_placeholder():
     return "Dashboard placeholder (build in feat/file-dashboard)"
+
+
+@app.errorhandler(403)
+def forbidden(_):
+    return render_template("403.html"), 403
 
 
 if __name__ == "__main__":
