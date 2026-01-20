@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # 1. The Database Service (Named "db")
+  # This creates the "host" your python code is looking for.
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: devops_user
+      POSTGRES_PASSWORD: devops_pass@123
+      POSTGRES_DB: devops_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  # 2. Your App Service
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=db  # <--- This matches the service name above!
+      - DB_NAME=devops_db
+      - DB_USER=devops_user
+      - DB_PASSWORD=devops_pass@123
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+    depends_on:
+      - db
+    volumes:
+      - .:/app  # Live sync: Changes you make to code update instantly
+
+volumes:
+  db_data:
