@@ -261,6 +261,55 @@ def dashboard():
 
     return render_template("dashboard.html", files=my_files, username=session.get("username"))
 
+@app.route("/dashboard/download/<int:file_id>")
+@login_required
+def download_file(file_id):
+    user_id = session["user_id"]
+    
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT filepath, filename FROM files WHERE id = %s AND user_id = %s",
+                (file_id, user_id)
+            )
+            file_record = cur.fetchone()
+            
+    if file_record:
+        return send_file(file_record[0], as_attachment=True, download_name=file_record[1])
+    else:
+        flash("Access Denied: You do not own this file.")
+        return redirect("/dashboard")
+
+@app.route("/dashboard/delete/<int:file_id>", methods=["POST"])
+@login_required
+def delete_file(file_id):
+    user_id = session["user_id"]
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT filepath FROM files WHERE id = %s AND user_id = %s",
+                (file_id, user_id)
+            )
+            result = cur.fetchone()
+            
+            if result:
+                filepath = result[0]
+                
+                cur.execute("DELETE FROM files WHERE id = %s", (file_id,))
+                conn.commit()
+                
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    flash("File deleted successfully.")
+                except Exception as e:
+                    print(f"Error deleting file from disk: {e}")
+                    flash("File record deleted, but disk cleanup failed.")
+            else:
+                flash("Error: File not found or Access Denied.")
+
+    return redirect("/dashboard")
 
 @app.errorhandler(403)
 def forbidden(_):
