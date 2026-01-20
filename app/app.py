@@ -3,8 +3,14 @@ import os
 import psycopg
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
+from werkzeug.utils import secure_filename
+from flask import send_file
 
 app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
 
 
@@ -17,6 +23,34 @@ def get_conn():
         port=int(os.getenv("DB_PORT", "5432")),
     )
 
+def init_db():
+    """Creates the users table if it does not exist."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(50) UNIQUE NOT NULL,
+                    password_hash VARCHAR(200) NOT NULL,
+                    role VARCHAR(20) NOT NULL
+                );
+            """)
+        conn.commit()
+
+def init_files_table():
+    """Creates the files table to link uploads to users."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS files (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    filename TEXT NOT NULL,
+                    filepath TEXT NOT NULL,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+        conn.commit()
 
 def ensure_initial_admin():
     username = os.getenv("DEFAULT_ADMIN_USER", "admin")
@@ -35,9 +69,11 @@ def ensure_initial_admin():
 
 
 try:
+    init_db()
+    init_files_table()
     ensure_initial_admin()
-except Exception:
-    pass
+except Exception as e:
+    print(f"Error initializing DB: {e}")
 
 
 def login_required(fn):
@@ -184,11 +220,96 @@ def admin_delete_user(user_id: int):
     return redirect(url_for("admin_dashboard"))
 
 
-@app.route("/dashboard")
+@app.route("/dashboard", methods=["GET", "POST"])
 @login_required
-def dashboard_placeholder():
-    return "Dashboard placeholder (build in feat/file-dashboard)"
+def dashboard():
+    user_id = session["user_id"]
 
+    if request.method == "POST":
+        if 'file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+            
+        file = request.files['file']
+        
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+            
+        if file:
+            filename = secure_filename(file.filename)
+            
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(save_path)
+            
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO files (user_id, filename, filepath) VALUES (%s, %s, %s)",
+                        (user_id, filename, save_path)
+                    )
+                conn.commit()
+            flash('File uploaded successfully')
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, filename FROM files WHERE user_id = %s",
+                (user_id,)
+            )
+            my_files = cur.fetchall()
+
+    return render_template("dashboard.html", files=my_files, username=session.get("username"))
+
+@app.route("/dashboard/download/<int:file_id>")
+@login_required
+def download_file(file_id):
+    user_id = session["user_id"]
+    
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT filepath, filename FROM files WHERE id = %s AND user_id = %s",
+                (file_id, user_id)
+            )
+            file_record = cur.fetchone()
+            
+    if file_record:
+        return send_file(file_record[0], as_attachment=True, download_name=file_record[1])
+    else:
+        flash("Access Denied: You do not own this file.")
+        return redirect("/dashboard")
+
+@app.route("/dashboard/delete/<int:file_id>", methods=["POST"])
+@login_required
+def delete_file(file_id):
+    user_id = session["user_id"]
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT filepath FROM files WHERE id = %s AND user_id = %s",
+                (file_id, user_id)
+            )
+            result = cur.fetchone()
+            
+            if result:
+                filepath = result[0]
+                
+                cur.execute("DELETE FROM files WHERE id = %s", (file_id,))
+                conn.commit()
+                
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    flash("File deleted successfully.")
+                except Exception as e:
+                    print(f"Error deleting file from disk: {e}")
+                    flash("File record deleted, but disk cleanup failed.")
+            else:
+                flash("Error: File not found or Access Denied.")
+
+    return redirect("/dashboard")
 
 @app.errorhandler(403)
 def forbidden(_):
