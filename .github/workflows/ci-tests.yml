@@ -9,9 +9,31 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: devops_user
+          POSTGRES_PASSWORD: devops_pass@123
+          POSTGRES_DB: devops_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U devops_user -d devops_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      DB_NAME: devops_db
+      DB_USER: devops_user
+      DB_PASSWORD: devops_pass@123
+      FLASK_SECRET_KEY: test-secret
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -25,4 +47,4 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        run: pytest
+        run: pytest -q
