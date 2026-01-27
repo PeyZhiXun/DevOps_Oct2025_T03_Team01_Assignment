@@ -8,6 +8,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS files (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  original_name TEXT NOT NULL,
-  stored_name TEXT NOT NULL UNIQUE
+  filename TEXT NOT NULL,  
+  filepath TEXT NOT NULL 
 );
