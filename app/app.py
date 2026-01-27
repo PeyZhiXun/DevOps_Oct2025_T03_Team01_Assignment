@@ -1,6 +1,7 @@
 from flask import Flask, request, redirect, session, render_template, flash, abort, url_for
 import os
 import psycopg
+import requests
 from werkzeug.security import check_password_hash, generate_password_hash
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -67,7 +68,6 @@ def ensure_initial_admin():
                 )
         conn.commit()
 
-
 try:
     init_db()
     init_files_table()
@@ -111,7 +111,7 @@ def db_test():
         return {"ok": True, "result": result}
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
-
+    
 
 # AUTH (feat/auth)
 @app.route("/login", methods=["GET", "POST"])
@@ -189,10 +189,35 @@ def admin_create_user():
                     (username, password_hash, role),
                 )
             conn.commit()
-        flash(f"User '{username}' created.")
+
+        webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
+        
+        print(f"DEBUG: Webhook URL found in env: {webhook_url}", flush=True)
+
+        if webhook_url:
+            try:
+                print("DEBUG: Preparing to send Discord request...", flush=True)
+                admin_name = session.get("username", "An Admin")
+                
+                payload = {
+                    "content": f"**Team Alert!**\nAdmin `{admin_name}` just created a new user:\n**User:** `{username}`\n**Role:** `{role}`"
+                }
+                
+                response = requests.post(webhook_url, json=payload)
+                print(f"DEBUG: Discord response code: {response.status_code}", flush=True)
+                print(f"DEBUG: Discord response text: {response.text}", flush=True)
+                
+            except Exception as e:
+                print(f"DEBUG ERROR: Failed to send Discord alert: {e}", flush=True)
+        else:
+            print("DEBUG: Webhook URL is NONE. Environment variable not loaded!", flush=True)
+
+        flash(f"User '{username}' created successfully.")
+        
     except psycopg.errors.UniqueViolation:
         flash("That username already exists.")
-    except Exception:
+    except Exception as e:
+        print(f"Error creating user: {e}")
         flash("Failed to create user due to server error.")
 
     return redirect(url_for("admin_dashboard"))

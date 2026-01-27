@@ -28,7 +28,7 @@ services:
       FLASK_SECRET_KEY: dev-only-secret-9f3a21b
       DEFAULT_ADMIN_USER: admin
       DEFAULT_ADMIN_PASS: admin@123
-
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
 
 volumes:
   pgdata:
