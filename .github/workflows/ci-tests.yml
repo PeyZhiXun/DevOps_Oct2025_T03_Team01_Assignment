@@ -46,5 +46,14 @@ jobs:
           pip install -r app/requirements.txt
           pip install pytest
 
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Initialize database schema
+        env:
+          PGPASSWORD: ${{ env.DB_PASSWORD }}
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U devops_user -d devops_db -f app/db/init.sql
+
       - name: Run tests
         run: pytest -q
