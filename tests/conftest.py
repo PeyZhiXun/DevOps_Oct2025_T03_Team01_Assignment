@@ -42,9 +42,28 @@ def clean_tables(db_conn):
     Clean DB tables before each test so tests are repeatable.
     """
     with db_conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(200) NOT NULL,
+                role VARCHAR(20) NOT NULL
+            );
+        """)
+            
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS files (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                filename TEXT NOT NULL,
+                filepath TEXT NOT NULL,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         cur.execute("DELETE FROM files;")
         cur.execute("DELETE FROM users;")
-    db_conn.commit()
+        db_conn.commit()
 
 
 def create_user(db_conn, username, password, role="user"):
