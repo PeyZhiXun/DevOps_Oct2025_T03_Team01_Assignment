@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-# ✅ Make sure the repo root is on the Python import path
 # This fixes: ModuleNotFoundError: No module named 'app'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -13,18 +12,14 @@ import pytest
 import psycopg
 from werkzeug.security import generate_password_hash
 
+os.environ.setdefault("DB_HOST", "127.0.0.1")
+os.environ.setdefault("DB_PORT", "5432")
+os.environ.setdefault("DB_NAME", "devops_db")
+os.environ.setdefault("DB_USER", "devops_user")
+os.environ.setdefault("DB_PASSWORD", "devops_pass@123")
 
 @pytest.fixture(scope="session")
 def db_conn():
-    """
-    Connect to the Postgres DB running in Docker.
-    You must set these environment variables in PowerShell before running pytest:
-      $env:DB_HOST="127.0.0.1"
-      $env:DB_PORT="5432"
-      $env:DB_NAME="devops_db"
-      $env:DB_USER="devops_user"
-      $env:DB_PASSWORD="devops_pass@123"
-    """
     conn = psycopg.connect(
         host=os.getenv("DB_HOST", "127.0.0.1"),
         port=int(os.getenv("DB_PORT", "5432")),
