@@ -342,13 +342,15 @@ def forbidden(_):
 
 @app.after_request
 def add_security_headers(response):
-    """
-    Add security headers to satisfy ZAP Scan requirements.
-    """
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
     response.headers['Permissions-Policy'] = "geolocation=(), microphone=(), camera=()"
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    
     return response
 
 if __name__ == "__main__":

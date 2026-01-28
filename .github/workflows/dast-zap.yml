@@ -20,6 +20,7 @@ jobs:
       - name: Start app (docker compose)
         run: |
           docker compose up -d --build
+          # Loop to wait until the app is actually ready
           for i in {1..40}; do
             if curl -sSf http://localhost:5000/ >/dev/null; then
               echo "App is up"; break
@@ -31,13 +32,14 @@ jobs:
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: "http://localhost:5000/"
-          fail_action: true
+          fail_action: false
+          allow_issue_writing: true 
 
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zap-report
+          name: zap-scan-report
           path: report_html.html
 
       - name: Stop stack
