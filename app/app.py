@@ -253,13 +253,13 @@ def dashboard():
     if request.method == "POST":
         if 'file' not in request.files:
             flash('No file part')
-            return redirect(request.url)
+            return redirect(url_for("dashboard"))
             
         file = request.files['file']
         
         if file.filename == '':
             flash('No selected file')
-            return redirect(request.url)
+            return redirect(url_for("dashboard"))
             
         if file:
             filename = secure_filename(file.filename)
