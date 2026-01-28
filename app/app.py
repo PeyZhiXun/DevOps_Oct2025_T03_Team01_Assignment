@@ -340,6 +340,16 @@ def delete_file(file_id):
 def forbidden(_):
     return render_template("403.html"), 403
 
+@app.after_request
+def add_security_headers(response):
+    """
+    Add security headers to satisfy ZAP Scan requirements.
+    """
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+    response.headers['Permissions-Policy'] = "geolocation=(), microphone=(), camera=()"
+    return response
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
