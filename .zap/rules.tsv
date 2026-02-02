@@ -1,0 +1,7 @@
+# Ignore common hardening findings 
+10055	IGNORE   # CSP Header Not Set
+90004	IGNORE   # Insufficient Site Isolation Against Spectre
+10063	IGNORE   # Permissions Policy Header Not Set
+10036	IGNORE   # Server Leaks Version Information via "Server" Header
+10021	IGNORE   # X-Content-Type-Options Header Missing
+10015	IGNORE   # Storable and Cacheable Content
