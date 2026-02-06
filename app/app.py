@@ -253,13 +253,13 @@ def dashboard():
     if request.method == "POST":
         if 'file' not in request.files:
             flash('No file part')
-            return redirect(request.url)
+            return redirect(url_for("dashboard"))
             
         file = request.files['file']
         
         if file.filename == '':
             flash('No selected file')
-            return redirect(request.url)
+            return redirect(url_for("dashboard"))
             
         if file:
             filename = secure_filename(file.filename)
@@ -340,6 +340,18 @@ def delete_file(file_id):
 def forbidden(_):
     return render_template("403.html"), 403
 
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+    response.headers['Permissions-Policy'] = "geolocation=(), microphone=(), camera=()"
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    
+    return response
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

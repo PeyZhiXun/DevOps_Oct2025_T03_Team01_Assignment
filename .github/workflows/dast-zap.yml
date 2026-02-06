@@ -6,9 +6,6 @@ on:
   push:
     branches: [ main, develop ]
 
-permissions:
-  contents: read
-
 jobs:
   zap:
     runs-on: ubuntu-latest
@@ -18,6 +15,7 @@ jobs:
       - name: Start app (docker compose)
         run: |
           docker compose up -d --build
+          # Loop to wait until the app is actually ready
           for i in {1..40}; do
             if curl -sSf http://localhost:5000/ >/dev/null; then
               echo "App is up"; break
@@ -31,15 +29,13 @@ jobs:
         with:
           target: "http://localhost:5000/"
           fail_action: true
-          allow_issue_writing: false
-          rules_file_name: ".zap/rules.tsv"
 
       - name: Upload ZAP report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
-          path: zap_report.html
+          path: report_html.html
 
       - name: Stop stack
         if: always()
