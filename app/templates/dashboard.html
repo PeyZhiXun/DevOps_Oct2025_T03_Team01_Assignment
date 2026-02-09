@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Dashboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    
+    input[type="file"] {
+        color: black !important;
+        font-weight: 500;
+    }
+
+    .actions {
+        white-space: nowrap;
+        text-align: left;
+    }
+
+    .table th.actions {
+        text-align: left;
+    }
+
+    .actions form {
+        display: inline-block;
+    }
+
+    .actions .btn-danger {
+        display: inline-block;
+        padding: 8px 16px;
+        min-width: 80px;
+        max-width: 120px;
+        text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card card-wide">
+    <div class="topbar">
+      <div>
+        <h1 class="title">User Dashboard</h1>
+        <p class="subtitle">Welcome, {{ username }}</p>
+      </div>
+
+      <a class="btn btn-link" href="/logout">Logout</a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for msg in messages %}
+          <div class="error" style="background: #e1f5fe; color: #0277bd; border-color: #b3e5fc;">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <hr class="hr" />
+
+    <h2>Upload Secure File</h2>
+    <p class="muted">Files are encrypted and isolated to your account.</p>
+
+    <form class="form" method="post" enctype="multipart/form-data">
+      <div class="grid3">
+        <div style="grid-column: span 2;">
+          <div class="label">Select Document</div>
+          <input class="input" name="file" type="file" required style="padding: 10px; background: white; color: black;">
+        </div>
+      </div>
+
+      <button class="btn" type="submit">Upload File</button>
+    </form>
+
+    <hr class="hr" />
+
+    <h2>My Files</h2>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Filename</th>
+            <th class="actions">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in files %}
+          <tr>
+            <td>{{ file[0] }}</td>
+            <td>{{ file[1] }}</td>
+            <td class="actions">
+              <a href="/dashboard/download/{{ file[0] }}" class="btn btn-link" style="margin-right: 10px;">Download</a>
+
+              <form method="post" 
+                    action="/dashboard/delete/{{ file[0] }}"
+                    onsubmit="return confirm('Delete file {{ file[1] }}?');" 
+                    style="display:inline;">
+                <button class="btn btn-danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" style="text-align: center; color: #888;">No files found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>

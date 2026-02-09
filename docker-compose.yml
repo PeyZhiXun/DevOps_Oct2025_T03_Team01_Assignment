@@ -4,12 +4,13 @@ services:
     container_name: devops-db
     environment:
       POSTGRES_USER: devops_user
-      POSTGRES_PASSWORD: devops_pass123
+      POSTGRES_PASSWORD: devops_pass@123
       POSTGRES_DB: devops_db
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./app/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
   web:
     build: ./app
@@ -23,7 +24,11 @@ services:
       DB_PORT: "5432"
       DB_NAME: devops_db
       DB_USER: devops_user
-      DB_PASSWORD: devops_pass123
+      DB_PASSWORD: devops_pass@123
+      FLASK_SECRET_KEY: dev-only-secret-9f3a21b
+      DEFAULT_ADMIN_USER: admin
+      DEFAULT_ADMIN_PASS: admin@123
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
 
 volumes:
   pgdata:

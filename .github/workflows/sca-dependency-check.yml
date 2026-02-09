@@ -2,9 +2,10 @@ name: SCA - Dependency Check
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
+
 
 permissions:
   contents: read
@@ -23,6 +24,8 @@ jobs:
           path: "."
           format: "HTML"
           out: "reports"
+          arg: >
+            --failOnCVSS 7
 
       - name: Upload report
         uses: actions/upload-artifact@v4
