@@ -7,15 +7,21 @@ from functools import wraps
 from werkzeug.utils import secure_filename
 from flask import send_file
 
+#Upload folder used for storing user files on the server.
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+#Secret key is used to sign session cookies (prevents tampering).
+#We read from env so secrets are not hard-coded in code for deployment.
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
 
 
 def get_conn():
+    #Standardise DB connector using environment variables.
+    #This keeps config consistent across local, CI, and deployment environments.
     return psycopg.connect(
         host=os.getenv("DB_HOST", "db"),
         dbname=os.getenv("DB_NAME", "devops_db"),
@@ -40,6 +46,7 @@ def init_db():
 
 def init_files_table():
     """Creates the files table to link uploads to users."""
+     #Files table ensures data ownership by linking each file to a user_id.
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -54,6 +61,8 @@ def init_files_table():
         conn.commit()
 
 def ensure_initial_admin():
+    #Bootstrap an initial admin account if none exists.
+    #This makes the MVP usable immediately after deployment.
     username = os.getenv("DEFAULT_ADMIN_USER", "admin")
     password = os.getenv("DEFAULT_ADMIN_PASS", "admin@123")
 
@@ -63,11 +72,13 @@ def ensure_initial_admin():
             exists = cur.fetchone()
             if not exists:
                 cur.execute(
+                    #Passwords are stored as hashes (never plain text).
                     "INSERT INTO users (username, password_hash, role) VALUES (%s, %s, 'admin')",
                     (username, generate_password_hash(password)),
                 )
         conn.commit()
 
+#Initialise DB tables on app startup (simple MVP approach).
 try:
     init_db()
     init_files_table()
@@ -77,6 +88,8 @@ except Exception as e:
 
 
 def login_required(fn):
+    #Authentication guard: blocks access for non-logged-in users.
+    #This is used for all routes that require an authenticated session.
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
@@ -86,6 +99,8 @@ def login_required(fn):
 
 
 def admin_required(fn):
+    #Authorization guard: ensures only admins can access admin routes.
+    #Non-admin users will receive a 403 Forbidden response.
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
@@ -98,11 +113,13 @@ def admin_required(fn):
 
 @app.route("/")
 def home():
+    #Simple check to confirm the app is running.
     return "DevSecOps MVP is running"
 
 
 @app.route("/db-test")
 def db_test():
+    # Simple DB connectivity check to validate configuration and connectivity.
     try:
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -113,9 +130,10 @@ def db_test():
         return {"ok": False, "error": str(e)}, 500
     
 
-# AUTH (feat/auth)
+#AUTH (feat/auth)
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    #GET shows login form; POST authenticates user credentials.
     if request.method == "GET":
         return render_template("login.html")
 
@@ -124,25 +142,30 @@ def login():
 
     with get_conn() as conn:
         with conn.cursor() as cur:
+            #Query user record by username.
             cur.execute(
                 "SELECT id, password_hash, role FROM users WHERE username=%s",
                 (username,),
             )
             row = cur.fetchone()
 
+    #Password verification uses hashing check, not direct string comparison.
     if not row or not check_password_hash(row[1], password):
         flash("Invalid login")
         return redirect("/login")
 
+    #Store minimal session state (used for RBAC checks and data isolation).
     session["user_id"] = row[0]
     session["username"] = username
     session["role"] = row[2]
 
+    #Role-based routing: admins go to /admin, users go to /dashboard.
     if row[2] == "admin":
         return redirect("/admin")
     return redirect("/dashboard")
 
 
+#Clears the session to log the user out securely.
 @app.route("/logout")
 @login_required
 def logout():
@@ -150,10 +173,11 @@ def logout():
     return redirect("/login")
 
 
-# ADMIN USERS (feat/admin-users)
+#ADMIN USERS (feat/admin-users)
 @app.route("/admin", methods=["GET"])
 @login_required
 @admin_required
+    #Admin dashboard lists all registered users (admin-only).
 def admin_dashboard():
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -164,6 +188,8 @@ def admin_dashboard():
 
 
 @app.route("/admin/create_user", methods=["POST"])
+#Admin-only endpoint for creating a new user account.
+#Password is stored as a hash; role is validated.
 @login_required
 @admin_required
 def admin_create_user():
@@ -190,6 +216,8 @@ def admin_create_user():
                 )
             conn.commit()
 
+        #Discord notification: demonstrates stakeholder alerts
+        #Uses a webhook URL stored in environment variables.
         webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
         
         print(f"DEBUG: Webhook URL found in env: {webhook_url}", flush=True)
@@ -227,6 +255,7 @@ def admin_create_user():
 @login_required
 @admin_required
 def admin_delete_user(user_id: int):
+    #Prevents admins from deleting their own account while logged in (safety check).
     if session.get("user_id") == user_id:
         flash("You cannot delete your own account while logged in.")
         return redirect(url_for("admin_dashboard"))
@@ -246,6 +275,7 @@ def admin_delete_user(user_id: int):
 
 
 @app.route("/dashboard", methods=["GET", "POST"])
+    #User dashboard: shows only the current user's uploaded files (data isolation).
 @login_required
 def dashboard():
     user_id = session["user_id"]
@@ -264,6 +294,7 @@ def dashboard():
         if file:
             filename = secure_filename(file.filename)
             
+            #Stores file to local uploads directory and records metadata in DB.
             save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(save_path)
             
@@ -276,6 +307,7 @@ def dashboard():
                 conn.commit()
             flash('File uploaded successfully')
 
+    #Query only files owned by the current logged-in user.
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -289,6 +321,8 @@ def dashboard():
 @app.route("/dashboard/download/<int:file_id>")
 @login_required
 def download_file(file_id):
+    #Data isolation enforcement: file download must match BOTH file_id and user_id.
+    #This prevents users from downloading other users' files by guessing IDs.
     user_id = session["user_id"]
     
     with get_conn() as conn:
@@ -308,6 +342,7 @@ def download_file(file_id):
 @app.route("/dashboard/delete/<int:file_id>", methods=["POST"])
 @login_required
 def delete_file(file_id):
+    #Data isolation enforcement: only the owner can delete the file record and disk file.
     user_id = session["user_id"]
 
     with get_conn() as conn:
@@ -321,6 +356,7 @@ def delete_file(file_id):
             if result:
                 filepath = result[0]
                 
+                #Delete the DB record first, then attempt disk cleanup.
                 cur.execute("DELETE FROM files WHERE id = %s", (file_id,))
                 conn.commit()
                 
@@ -338,10 +374,12 @@ def delete_file(file_id):
 
 @app.errorhandler(403)
 def forbidden(_):
+     #Custom 403 page to show unauthorized access (RBAC enforcement).
     return render_template("403.html"), 403
 
 @app.after_request
 def add_security_headers(response):
+    #Basic hardening headers to reduce common browser attacks.
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
