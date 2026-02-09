@@ -1,6 +1,7 @@
 name: DAST - ZAP Baseline
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [ main, develop ]
   push:
@@ -18,7 +19,7 @@ jobs:
       - name: Start app (docker compose)
         run: |
           docker compose up -d --build
-          # Loop to wait until the app is actually ready
+          # Wait until the app is ready
           for i in {1..60}; do
             if curl -sSf http://localhost:5000/ >/dev/null; then
               echo "App is up"; break
@@ -28,19 +29,40 @@ jobs:
           done
           curl -sS http://localhost:5000/ | head -n 5
 
-      - name: Run ZAP Baseline Scan (non-blocking)
+      # BYPASS: even if the ZAP action's internal artifact upload fails,
+      # the workflow will continue and still upload the report using upload-artifact@v4 below.
+      - name: Run ZAP Baseline Scan 
         uses: zaproxy/action-baseline@v0.12.0
+        continue-on-error: true
         with:
           target: "http://localhost:5000/"
           fail_action: false
           allow_issue_writing: false
 
-      - name: Upload ZAP report
+      - name: Verify ZAP reports exist
+        if: always()
+        run: |
+          echo "Listing generated reports:"
+          ls -lah report_json.json report_md.md report_html.html || true
+
+      - name: Upload ZAP report (HTML)
         if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: zap-report
           path: report_html.html
+
+      - name: Upload ZAP reports (all formats)
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: zap-reports
+          path: |
+            report_json.json
+            report_md.md
+            report_html.html
 
       - name: Stop stack
         if: always()
